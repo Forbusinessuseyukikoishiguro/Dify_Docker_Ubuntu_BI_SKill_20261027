@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>業務ダッシュボード（サンプル）</title>
+<style>
+  :root { --bg:#f5f7fb; --card:#ffffff; --ink:#1f2937; --muted:#4b5563; --accent:#1f3864; --up:#166534; --down:#991b1b; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg:#111827; --card:#1f2937; --ink:#f9fafb; --muted:#d1d5db; --accent:#93c5fd; --up:#86efac; --down:#fca5a5; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Yu Gothic", "Meiryo", system-ui, sans-serif; background:var(--bg); color:var(--ink); font-size:16px; line-height:1.6; }
+  header { padding: 16px 20px; border-bottom: 1px solid #d1d5db; }
+  h1 { font-size: 1.4rem; margin: 0; color: var(--accent); }
+  .meta { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+  main { padding: 16px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); max-width: 1200px; margin: 0 auto; }
+  section { background: var(--card); border-radius: 10px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  section h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  .kpi { font-size: 2rem; font-weight: 700; color: var(--accent); }
+  .delta.up { color: var(--up); } .delta.down { color: var(--down); }
+  .bars { display: grid; gap: 6px; }
+  .bar-row { display: grid; grid-template-columns: 5.5em 1fr 4.5em; align-items: center; gap: 8px; font-size: .9rem; }
+  .bar { height: 14px; background: var(--accent); border-radius: 3px; min-width: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid #e5e7eb; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  @media print { header, main { font-size: 12pt; } section { box-shadow: none; break-inside: avoid; } }
+  @media (max-width: 480px) { .kpi { font-size: 1.6rem; } .bar-row { grid-template-columns: 4.5em 1fr 4em; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>業務ダッシュボード（サンプル）</h1>
+  <p class="meta">対象期間：<span id="period"></span>　／　最終更新：<span id="updated"></span>　／　数値はサンプル</p>
+</header>
+<main>
+  <section aria-labelledby="k1">
+    <h2 id="k1">今月の処理件数</h2>
+    <p class="kpi" id="kpi-count"></p>
+    <p class="delta" id="kpi-delta"></p>
+  </section>
+  <section aria-labelledby="k2">
+    <h2 id="k2">部門別の件数</h2>
+    <div class="bars" id="bars" role="img" aria-label="部門別の件数の棒グラフ（数値は下の表を参照）"></div>
+    <details><summary>表で見る</summary>
+      <table><thead><tr><th>部門</th><th class="num">件数</th></tr></thead><tbody id="tbl-dept"></tbody></table>
+    </details>
+  </section>
+  <section aria-labelledby="k3">
+    <h2 id="k3">月別の推移</h2>
+    <table><caption class="sr-only">月別の件数</caption><thead><tr><th>月</th><th class="num">件数</th><th class="num">前月比</th></tr></thead><tbody id="tbl-month"></tbody></table>
+  </section>
+</main>
+<script>
+  // ==== データ（ここを差し替える）====
+  const DATA = {
+    period: "2026年10月（サンプル）",
+    updated: "2026-10-24",
+    thisMonth: 1280,
+    lastMonth: 1195,
+    departments: [ {name:"営業", value:420}, {name:"経理", value:310}, {name:"情報システム", value:270}, {name:"総務", value:280} ],
+    months: [ {m:"2026-07", v:1102}, {m:"2026-08", v:1160}, {m:"2026-09", v:1195}, {m:"2026-10", v:1280} ]
+  };
+
+  const fmt = n => n.toLocaleString("ja-JP");
+  const pct = (a, b) => (((a - b) / b) * 100).toFixed(1);
+
+  document.getElementById("period").textContent = DATA.period;
+  document.getElementById("updated").textContent = DATA.updated;
+
+  // KPI（増減は記号と文字で示す。色だけに頼らない）
+  const diff = DATA.thisMonth - DATA.lastMonth;
+  document.getElementById("kpi-count").textContent = fmt(DATA.thisMonth) + " 件";
+  const d = document.getElementById("kpi-delta");
+  d.textContent = (diff >= 0 ? "▲ " : "▼ ") + fmt(Math.abs(diff)) + " 件（前月比 " + pct(DATA.thisMonth, DATA.lastMonth) + "%）";
+  d.className = "delta " + (diff >= 0 ? "up" : "down");
+
+  // 棒グラフ（最大値を基準に幅を決める）
+  const max = Math.max(...DATA.departments.map(x => x.value));
+  const bars = document.getElementById("bars");
+  const tblDept = document.getElementById("tbl-dept");
+  DATA.departments.forEach(x => {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.setAttribute("aria-hidden", "true");
+    row.innerHTML = '<span></span><div class="bar"></div><span class="num"></span>';
+    row.children[0].textContent = x.name;
+    row.children[1].style.width = (x.value / max * 100).toFixed(1) + "%";
+    row.children[2].textContent = fmt(x.value);
+    bars.appendChild(row);
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td></td><td class='num'></td>";
+    tr.children[0].textContent = x.name;
+    tr.children[1].textContent = fmt(x.value);
+    tblDept.appendChild(tr);
+  });
+
+  // 月次の表（前月比）
+  const tblMonth = document.getElementById("tbl-month");
+  DATA.months.forEach((x, i) => {
+    const prev = i > 0 ? DATA.months[i - 1].v : null;
+    const tr = document.createElement("tr");
+    const change = prev === null ? "（基準）" : ((x.v - prev >= 0 ? "▲ " : "▼ ") + pct(x.v, prev) + "%");
+    tr.innerHTML = "<td></td><td class='num'></td><td class='num'></td>";
+    tr.children[0].textContent = x.m;
+    tr.children[1].textContent = fmt(x.v);
+    tr.children[2].textContent = change;
+    tblMonth.appendChild(tr);
+  });
+</script>
+</body>
+</html>
